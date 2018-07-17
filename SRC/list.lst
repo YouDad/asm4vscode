@@ -1,0 +1,1338 @@
+Microsoft (R) Macro Assembler Version 6.15.8803		    06/19/18 23:17:51
+exp.asm							     Page 1 - 1
+
+
+				include stdio.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C ;@str:'asjdiooj'
+			      C ;@asciiz:'asjdiojx',0
+			      C ;@$tr:'asjdijax$'
+			      C ;@16:16位
+			      C ;@8:8位
+			      C ;@signed:带符号数
+			      C ;@reg:寄存器
+			      C ;@i:立即数
+			      C ;@or:或者
+			      C ;@and:而且
+			      C ;@identifier:标识符
+			      C ;@label:可跳转的标签
+			      C ;@type:通过dtype定义的标识符
+			      C 
+			      C 
+			      C ;拓展指令:
+			      C ;1.move @r16,@r8 将八位寄存器的内容送到十六位寄存器里 , @16不能是AX
+			      C ;2.loadparam @i,@i,@r16 保护first@i个寄存器的情况下,取出通过堆栈传递的第second@i个参数,放到@16里
+			      C ;attention:参数从1开始计数
+			      C ;高效loadoaram的三个子命令(适用于多参的情况):
+			      C ;3.使用前先loadstart取得bp值
+			      C ;4.然后使用loadp @i,@i,@r16 意义和第2条指令一样
+			      C ;5.最后用loadend恢复堆栈平衡
+			      C 
+ 0000			      C __base__ segment
+			      C     move macro r16,r8
+			      C         push ax
+			      C         mov al,r8
+			      C         cbw
+			      C         mov r16,ax
+			      C         pop ax
+			      C     endm
+			      C     loadstart macro
+			      C         push bp
+			      C         push sp
+			      C         pop bp
+			      C     endm
+			      C     loadp macro protected,paramid,target
+			      C         mov target,[bp+protected*2+4+paramid*2]
+			      C     endm
+			      C     loadend macro
+			      C         pop bp
+			      C     endm
+			      C     loadparam macro protected,paramid,target
+			      C         push bp
+			      C         push sp
+			      C         pop bp
+			      C         mov target,[bp+protected*2+4+paramid*2]
+			      C         pop bp
+			      C     endm
+			      C     call82 macro func,p81,p82
+			      C         push ax
+			      C         move ax,p82
+			      C         push ax
+			      C         move ax,p81
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     callso macro func,label
+			      C         push ax
+			      C         mov ax,offset label
+			      C         push ax
+			      C         mov ax,seg label
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     callso2 macro func,label,other_label
+			      C         push ax
+			      C         mov ax,offset other_label
+			      C         push ax
+			      C         mov ax,seg other_label
+			      C         push ax
+			      C         mov ax,offset label
+			      C         push ax
+			      C         mov ax,seg label
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     callso282 macro func,label,other_label,p81,p82
+			      C         push ax
+			      C         move ax,p82
+			      C         push ax
+			      C         move ax,p81
+			      C         push ax
+			      C         mov ax,offset other_label
+			      C         push ax
+			      C         mov ax,seg other_label
+			      C         push ax
+			      C         mov ax,offset label
+			      C         push ax
+			      C         mov ax,seg label
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     call0 macro func
+			      C         call func
+			      C     endm
+			      C     call1 macro func,p1
+			      C         push ax
+			      C         mov ax,p1
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     call2 macro func,p1,p2
+			      C         push ax
+			      C         mov ax,p2
+			      C         push ax
+			      C         mov ax,p1
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+			      C     call3 macro func,p1,p2,p3
+			      C         push ax
+			      C         mov ax,p3
+			      C         push ax
+			      C         mov ax,p2
+			      C         push ax
+			      C         mov ax,p1
+			      C         push ax
+			      C         call func
+			      C         pop ax
+			      C     endm
+ 0000			      C __base__ ends
+			      C endif
+			      C 
+			      C ifdef __stdio__
+			      C else
+ 0000			      C __stdio__ segment
+			      C     ;define list
+			      C     ;1.dbuffer identifier,size,init=0
+			      C     ;function list
+			      C     ;1.void putchar (@r16/@i)
+			      C     ;2.void put$ (@$tr)
+			      C     ;3.void puts (@asciiz)
+			      C     ;4.void put (@buffer)
+			      C     ;5.void gets (@buffer)
+			      C     ;6.ax getch (void)
+			      C 
+			      C     ;1.dbuffer buffer,size,init=0
+			      C     ;buffer is name of buffer,size is size of buffer
+			      C     ;init is first content in the buffer,default is 0
+			      C     ;dbuffer macro buffer,size,init:=<0>
+			      C 
+			      C     ;1.void putchar (@r16/@i)
+			      C     ;display low 8 bits %c
+			      C 
+			      C     ;2.void put$ (@$tr)
+			      C     ;display %$
+			      C 
+			      C     ;3.void puts (@asciiz)
+			      C     ;display %s
+			      C 
+			      C     ;4.void put (@buffer)
+			      C     ;display buffer content
+			      C 
+			      C     ;5.void gets (@buffer)
+			      C     ;read from keyboard,content into buffer
+			      C 
+			      C     ;6.ax getch (void)
+			      C     ;ax=ascii
+			      C     ;getch macro
+			      C 
+ = call1 _putchar_,	      C     putchar equ call1 _putchar_,
+ = callso _put$_,	      C     put$ equ callso _put$_,
+ = callso _puts_,	      C     puts equ callso _puts_,
+ = callso _put_,	      C     put equ callso _put_,
+ = callso _gets_,	      C     gets equ callso _gets_,
+			      C 
+ 0000			      C     _putchar_ proc far
+ 0000  52		      C         push dx
+ 0001  50		      C         push ax
+ 0002  55		      C         push bp
+			      C 
+ 0003  54		      C         push sp
+ 0004  5D		      C         pop bp
+ 0005  8A 56 0A		      C         mov dl,[bp+3*2+4]
+ 0008  B4 02		      C         mov ah,2
+ 000A  CD 21		      C         int 21h
+			      C 
+ 000C  5D		      C         pop bp
+ 000D  58		      C         pop ax
+ 000E  5A		      C         pop dx
+ 000F  CA 0002		      C         ret 2
+ 0012			      C     _putchar_ endp
+ 0012			      C     _put$_ proc far
+ 0012  1E		      C         push ds
+ 0013  52		      C         push dx
+ 0014  50		      C         push ax
+ 0015  55		      C         push bp
+			      C 
+ 0016  54		      C         push sp
+ 0017  5D		      C         pop bp
+ 0018  8B 46 0C		      C         mov ax,[bp+4*2+4]
+ 001B  8E D8		      C         mov ds,ax
+ 001D  8B 56 0E		      C         mov dx,[bp+5*2+4]
+ 0020  B4 09		      C         mov ah,9
+ 0022  CD 21		      C         int 21h
+			      C 
+ 0024  5D		      C         pop bp
+ 0025  58		      C         pop ax
+ 0026  5A		      C         pop dx
+ 0027  1F		      C         pop ds
+ 0028  CA 0004		      C         ret 4
+ 002B			      C     _put$_ endp
+ 002B			      C     _puts_ proc far
+ 002B  1E		      C         push ds
+ 002C  56		      C         push si
+ 002D  50		      C         push ax
+ 002E  55		      C         push bp
+			      C 
+ 002F  54		      C         push sp
+ 0030  5D		      C         pop bp
+ 0031  8B 46 0C		      C         mov ax,[bp+4*2+4]
+ 0034  8E D8		      C         mov ds,ax
+ 0036  8B 76 0E		      C         mov si,[bp+5*2+4]
+ 0039  B4 02		      C         mov ah,2
+ 003B  FC		      C         cld
+ 003C			      C         _puts_$loop:
+ 003C  AC		      C         lodsb
+ 003D  3C 00		      C         cmp al,0
+ 003F  74 06		      C         jz _puts_$end
+ 0041  8A D0		      C         mov dl,al
+ 0043  CD 21		      C         int 21h
+ 0045  EB F5		      C         jmp _puts_$loop
+			      C 
+ 0047			      C         _puts_$end:
+ 0047  5D		      C         pop bp
+ 0048  58		      C         pop ax
+ 0049  5E		      C         pop si
+ 004A  1F		      C         pop ds
+ 004B  CA 0004		      C         ret 4
+ 004E			      C     _puts_ endp
+ 004E			      C     _put_ proc far
+ 004E  1E		      C         push ds
+ 004F  56		      C         push si
+ 0050  50		      C         push ax
+ 0051  55		      C         push bp
+			      C 
+ 0052  54		      C         push sp
+ 0053  5D		      C         pop bp
+ 0054  8B 46 0C		      C         mov ax,[bp+4*2+4]
+ 0057  8E D8		      C         mov ds,ax
+ 0059  8B 76 0E		      C         mov si,[bp+5*2+4]
+ 005C  4E		      C         dec si
+ 005D  33 C9		      C         xor cx,cx
+ 005F  8A 0C		      C         mov cl,[si]
+ 0061  46		      C         inc si
+ 0062  B4 02		      C         mov ah,2
+ 0064  FC		      C         cld
+ 0065  E3 0A		      C         jcxz _put_$end
+ 0067			      C         _put_$loop:
+ 0067  AC		      C         lodsb
+ 0068  49		      C         dec cx
+ 0069  8A D0		      C         mov dl,al
+ 006B  CD 21		      C         int 21h
+ 006D  74 02		      C         jz _put_$end
+ 006F  EB F6		      C         jmp _put_$loop
+			      C 
+ 0071			      C         _put_$end:
+ 0071  5D		      C         pop bp
+ 0072  58		      C         pop ax
+ 0073  5E		      C         pop si
+ 0074  1F		      C         pop ds
+ 0075  CA 0004		      C         ret 4
+ 0078			      C     _put_ endp
+			      C     getch macro
+			      C         mov ah,1
+			      C         int 21h
+			      C         mov ah,0
+			      C     endm
+			      C     dbuffer macro buffer,size,init:=<0>
+			      C         pre_&buffer db size,0
+			      C         &buffer db size dup(init),0
+			      C     endm
+ 0078			      C     _gets_ proc far
+ 0078  50		      C         push ax
+ 0079  52		      C         push dx
+ 007A  1E		      C         push ds
+ 007B  56		      C         push si
+ 007C  55		      C         push bp
+			      C 
+ 007D  54		      C         push sp
+ 007E  5D		      C         pop bp
+ 007F  8B 46 0E		      C         mov ax,[bp+5*2+4]
+ 0082  8E D8		      C         mov ds,ax
+ 0084  B4 0A		      C         mov ah,0ah
+ 0086  8B 56 10		      C         mov dx,[bp+6*2+4]
+ 0089  83 EA 02		      C         sub dx,2
+ 008C  CD 21		      C         int 21h
+ 008E  8B F2		      C         mov si,dx
+ 0090  46		      C         inc si
+ 0091  8A 04		      C         mov al,[si]
+ 0093  B4 00		      C         mov ah,0
+ 0095  03 F0		      C         add si,ax
+ 0097  46		      C         inc si
+ 0098  C6 04 00		      C         mov byte ptr [si],0
+			      C 
+ 009B  5D		      C         pop bp
+ 009C  5E		      C         pop si
+ 009D  1F		      C         pop ds
+ 009E  5A		      C         pop dx
+ 009F  58		      C         pop ax
+ 00A0  CA 0004		      C         ret 4
+ 00A3			      C     _gets_ endp
+ 00A3			      C __stdio__ ends
+			      C endif
+			      C ifdef hiahiahia
+			      C endif
+			      C 
+				include file.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C include stdio.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C ifdef __stdio__
+			      C else
+			      C endif
+			      C ifdef hiahiahia
+			      C endif
+			      C 
+			      C ifdef __file__
+			      C else
+ 0000			      C __file__ segment
+			      C     ;define list
+			      C     ;1.dfile @identifier,@str
+			      C     ;function list
+			      C     ;1.void fopen(@file,@16,@i)
+			      C     ;2.void fclose(@file)
+			      C     ;3.void ferror(@file,@label)
+			      C     ;4.ax fgets (@file,@buffer)
+			      C 
+			      C     ;1.dfile @identifier,@str
+			      C     ;define file data,name is the file's description
+			      C     ;dfile macro fp,fname
+			      C 
+			      C     ;1.void fopen(@file,@16,@i)
+			      C     ;use @file to open @16 by mode @i
+			      C     ;fopen macro fp,path,mode
+			      C 
+			      C     ;2.void fclose(@file)
+			      C     ;use @file to close file
+			      C     ;fclose macro fp
+			      C 
+			      C     ;3.void ferror(@file,@label)
+			      C     ;define codes warning and then jmp @label
+			      C     ;ferror macro fp,finally
+			      C 
+			      C     ;4.ax fgets (@file,@buffer)
+			      C     ;read @file file and save into buffer
+			      C     ;ax is readed bytes,0 is meaning eof
+			      C     ;fgets macro fp,buffer
+			      C 
+			      C     ;fp:@identifier,fname:@fname
+			      C     dfile macro fp,fname
+			      C         handle_&fp dw 0
+			      C         error_open_&fp db 'open file fail!$'
+			      C         error_read_&fp db 'read file fail!$'
+			      C         name_&fp db fname,0
+			      C         r = 0   ;;mode:read
+			      C         w = 1   ;;mode:write
+			      C         rw = 3  ;;mode:read&write
+			      C     endm
+			      C     ;fp:@file,path:@16,mode:@i
+			      C     fopen macro fp,path,mode
+			      C         push ax
+			      C         push dx
+			      C         mov dx,path
+			      C         mov ah,3dh
+			      C         mov al,mode ;;r/w/rw
+			      C         int 21h
+			      C         jc open_fail$&fp
+			      C         mov handle_&fp,ax
+			      C         pop dx
+			      C         pop ax
+			      C     endm
+			      C     ;fp:@file
+			      C     fclose macro fp
+			      C         push ax
+			      C         push bx
+			      C         mov bx,handle_&fp
+			      C         mov ah,3eh
+			      C         int 21h
+			      C         pop bx
+			      C         pop ax
+			      C     endm
+			      C     ;fp:@file,finally:@label
+			      C     ferror macro fp,finally
+			      C         open_fail$&fp:
+			      C             put$ error_open_&fp
+			      C             putchar ':'
+			      C             puts name_&fp
+			      C             jmp finally
+			      C         read_fail$&fp:
+			      C             fclose fp
+			      C             put$ error_read_&fp
+			      C             putchar ':'
+			      C             puts name_&fp
+			      C             jmp finally
+			      C     endm
+			      C     ;fp:@file,buffer:@buffer
+			      C     ;in:fp-file pointer,buffer-cache head pointer
+			      C     ;out:ax=readed bytes,0 is eof
+			      C     fgets macro fp,buffer
+			      C         push bx
+			      C         push cx
+			      C         push dx
+			      C         mov ah,3fh
+			      C         lea dx,buffer
+			      C         mov bx,handle_&fp
+			      C         xor cx,cx
+			      C         mov cl,pre_&buffer
+			      C         int 21h
+			      C         jc read_fail$&fp
+			      C         mov bx,offset pre_&buffer
+			      C         inc bx
+			      C         mov [bx],al
+			      C         pop dx
+			      C         pop cx
+			      C         pop bx
+			      C     endm
+ 0000			      C __file__ ends
+			      C endif
+			      C 
+				include conarg.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C ifdef __conarg__
+			      C else
+ 0000			      C __conarg__ segment
+			      C     ;define list
+			      C     ;1.darg
+			      C     ;function list
+			      C     ;1.void loadarg(void)
+			      C 
+			      C     ;1.darg
+			      C     ;define arg data
+			      C     ;darg macro
+			      C 
+			      C     ;1.void loadarg(void)
+			      C     ;load data in es:80H into arg
+			      C     ;arg is asciiz
+			      C     ;loadarg macro
+			      C 
+ = call0 _loadarg_	      C     loadarg equ call0 _loadarg_
+			      C 
+			      C     darg macro
+			      C         arg db 80h dup(0)
+			      C     endm
+ 0000			      C     _loadarg_ proc far
+ 0000  50		      C         push ax
+ 0001  51		      C         push cx
+ 0002  56		      C         push si
+ 0003  57		      C         push di
+ 0004  33 C9		      C         xor cx,cx
+ 0006  26: 8A 0E 0080	      C         mov cl,es:[80h]
+ 000B  FE C9		      C         dec cl
+ 000D  BE 0082		      C         mov si,82h
+ 0010  BF 0004 R	      C         mov di,offset arg
+ 0013			      C         _loadarg_@loadarg:
+ 0013  26: 8A 04	      C         mov al,es:[si]
+ 0016  3C 20		      C         cmp al,' '
+ 0018  74 06		      C         jz _loadarg_@ok
+ 001A  88 05		      C         mov [di],al
+ 001C  46		      C         inc si
+ 001D  47		      C         inc di
+ 001E  E2 F3		      C         loop _loadarg_@loadarg
+ 0020			      C         _loadarg_@ok:
+ 0020  5F		      C         pop di
+ 0021  5E		      C         pop si
+ 0022  59		      C         pop cx
+ 0023  58		      C         pop ax
+ 0024  CB		      C         ret
+ 0025			      C     _loadarg_ endp
+ 0025			      C __conarg__ ends
+			      C endif
+			      C ifdef hiahiahia
+			      C endif
+			      C 
+				include display.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C ifdef __display__
+			      C else
+ 0000			      C __display__ segment
+			      C     ;define list
+			      C     ;nop
+			      C     ;function list
+			      C     ;1.void h16 (@16)
+			      C     ;2.void h8 (@16)
+			      C     ;3.void h4 (@16)
+			      C     ;4.void d16 (@16)
+			      C 
+			      C     ;1.h16 @16
+			      C     ;display @16 by 4%x
+			      C 
+			      C     ;2.h8 @16
+			      C     ;display @16's low 8 bits by 2%x
+			      C 
+			      C     ;3.h4 @16
+			      C     ;display @16's low 4 bits by %x
+			      C 
+			      C     ;4.d16 @16
+			      C     ;display @16 by %d
+			      C 
+ = call1 _h16_,		      C     h16 equ call1 _h16_,
+ = call1 _h8_,		      C     h8 equ call1 _h8_,
+ = call1 _h4_,		      C     h4 equ call1 _h4_,
+ = call1 _d16_,		      C     d16 equ call1 _d16_,
+			      C 
+ 0000			      C     _h16_ proc far
+ 0000  53		      C         push bx
+ 0001  52		      C         push dx
+			      C 
+			      C         loadparam 2,1,ax
+ 0002  55		     1C         push bp
+ 0003  54		     1C         push sp
+ 0004  5D		     1C         pop bp
+ 0005  8B 46 0A		     1C         mov ax,[bp+2*2+4+1*2]
+ 0008  5D		     1C         pop bp
+ 0009  8A DC		      C         mov bl,ah
+			      C         h8 bx
+ 000B  50		     1C         push ax
+ 000C  8B C3		     1C         mov ax,bx
+ 000E  50		     1C         push ax
+ 000F  0E E8 000F	     1C         call _h8_
+ 0013  58		     1C         pop ax
+			      C         h8 ax
+ 0014  50		     1C         push ax
+ 0015  8B C0		     1C         mov ax,ax
+ 0017  50		     1C         push ax
+ 0018  0E E8 0006	     1C         call _h8_
+ 001C  58		     1C         pop ax
+			      C 
+ 001D  5A		      C         pop dx
+ 001E  5B		      C         pop bx
+ 001F  CA 0002		      C         ret 2
+ 0022			      C     _h16_ endp
+ 0022			      C     _h8_ proc far
+ 0022  53		      C         push bx
+ 0023  52		      C         push dx
+			      C 
+			      C         loadparam 2,1,ax
+ 0024  55		     1C         push bp
+ 0025  54		     1C         push sp
+ 0026  5D		     1C         pop bp
+ 0027  8B 46 0A		     1C         mov ax,[bp+2*2+4+1*2]
+ 002A  5D		     1C         pop bp
+ 002B  8A D8		      C         mov bl,al
+ 002D  D0 E8		      C         shr al,1
+ 002F  D0 E8		      C         shr al,1
+ 0031  D0 E8		      C         shr al,1
+ 0033  D0 E8		      C         shr al,1
+			      C         h4 ax
+ 0035  50		     1C         push ax
+ 0036  8B C0		     1C         mov ax,ax
+ 0038  50		     1C         push ax
+ 0039  0E E8 000F	     1C         call _h4_
+ 003D  58		     1C         pop ax
+			      C         h4 bx
+ 003E  50		     1C         push ax
+ 003F  8B C3		     1C         mov ax,bx
+ 0041  50		     1C         push ax
+ 0042  0E E8 0006	     1C         call _h4_
+ 0046  58		     1C         pop ax
+			      C 
+ 0047  5A		      C         pop dx
+ 0048  5B		      C         pop bx
+ 0049  CA 0002		      C         ret 2
+ 004C			      C     _h8_ endp
+ 004C			      C     _h4_ proc far
+ 004C  52		      C         push dx
+			      C 
+			      C         loadparam 1,1,ax
+ 004D  55		     1C         push bp
+ 004E  54		     1C         push sp
+ 004F  5D		     1C         pop bp
+ 0050  8B 46 08		     1C         mov ax,[bp+1*2+4+1*2]
+ 0053  5D		     1C         pop bp
+ 0054  83 E0 0F		      C         and ax,000fh
+ 0057  B4 02		      C         mov ah,2
+ 0059  3C 0A		      C         cmp al,10
+ 005B  72 02		      C         jb _h4_@num
+ 005D  04 07		      C         add al,7
+ 005F			      C         _h4_@num:
+ 005F  04 30		      C         add al,30h
+ 0061  8A D0		      C         mov dl,al
+ 0063  CD 21		      C         int 21h
+			      C 
+ 0065  5A		      C         pop dx
+ 0066  CA 0002		      C         ret 2
+ 0069			      C     _h4_ endp
+ 0069			      C     _d16_ proc far
+ 0069  53		      C         push bx
+ 006A  51		      C         push cx
+ 006B  52		      C         push dx
+			      C 
+			      C         loadparam 3,1,ax
+ 006C  55		     1C         push bp
+ 006D  54		     1C         push sp
+ 006E  5D		     1C         pop bp
+ 006F  8B 46 0C		     1C         mov ax,[bp+3*2+4+1*2]
+ 0072  5D		     1C         pop bp
+ 0073  BB 000A		      C         mov bx,10
+ 0076  33 C9		      C         xor cx,cx
+ 0078			      C         _d16_@loop:
+ 0078  83 F8 00		      C         cmp ax,0
+ 007B  74 08		      C         jz _d16_@put
+ 007D  33 D2		      C         xor dx,dx
+ 007F  F7 F3		      C         div bx
+ 0081  52		      C         push dx
+ 0082  41		      C         inc cx
+ 0083  EB F3		      C         jmp _d16_@loop
+ 0085			      C         _d16_@put:
+ 0085  E3 07		      C         jcxz _d16_@end
+ 0087  0E E8 FFC1	      C         call _h4_
+ 008B  49		      C         dec cx
+ 008C  EB F7		      C         jmp _d16_@put
+ 008E			      C         _d16_@end:
+			      C 
+ 008E  5A		      C         pop dx
+ 008F  59		      C         pop cx
+ 0090  5B		      C         pop bx
+ 0091  CA 0002		      C         ret 2
+ 0094			      C     _d16_ endp
+ 0094			      C __display__ ends
+			      C endif
+			      C ifdef hiahiahiahiahia
+			      C endif
+			      C 
+				include string.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C include math.asm
+			      C include base.asm
+			      C ifdef __base__
+			      C else
+			      C endif
+			      C 
+			      C ifdef __math__
+			      C else
+ 0000			      C __math__ segment
+			      C     ;define list
+			      C     ;
+			      C     ;function list
+			      C     ;1.bl min8(@8,@8)
+			      C     ;2.bh max8(@8,@8)
+			      C     ;3.bx min16(@16,@16)
+			      C     ;4.bx max16(@16,@16)
+			      C 
+			      C     ;1.bl min8(@8,@8)
+			      C     ;bl=min(@8,@8)
+			      C 
+			      C     ;2.bh max8(@8,@8)
+			      C     ;bh=max(@8,@8)
+			      C 
+			      C     ;3.bx min16(@16,@16)
+			      C     ;bx=min(@16,@16)
+			      C 
+			      C     ;4.bx max16(@16,@16)
+			      C     ;bx=max(@16,@16)
+			      C 
+			      C     ;这里的函数均不保护bx&F寄存器
+			      C     ;哪怕返回值是bl,bh也会被改变
+			      C     ;attention!
+			      C 
+ = call82 _min8_,	      C     min8 equ call82 _min8_,
+ = call82 _max8_,	      C     max8 equ call82 _max8_,
+ = call2 _min16_,	      C     min16 equ call2 _min16_,
+ = call2 _max16_,	      C     max16 equ call2 _max16_,
+			      C 
+ 0000			      C     _min8_ proc far
+			      C         loadparam 0,1,ax
+ 0000  55		     1C         push bp
+ 0001  54		     1C         push sp
+ 0002  5D		     1C         pop bp
+ 0003  8B 46 06		     1C         mov ax,[bp+0*2+4+1*2]
+ 0006  5D		     1C         pop bp
+			      C         loadparam 0,2,bx
+ 0007  55		     1C         push bp
+ 0008  54		     1C         push sp
+ 0009  5D		     1C         pop bp
+ 000A  8B 5E 08		     1C         mov bx,[bp+0*2+4+2*2]
+ 000D  5D		     1C         pop bp
+ 000E  3B C3		      C         cmp ax,bx
+ 0010  73 02		      C         jae _min8_@end
+ 0012  8B D8		      C         mov bx,ax
+ 0014			      C         _min8_@end:
+ 0014  CA 0004		      C         ret 4
+ 0017			      C     _min8_ endp
+ 0017			      C     _max8_ proc far
+			      C         loadparam 0,1,ax
+ 0017  55		     1C         push bp
+ 0018  54		     1C         push sp
+ 0019  5D		     1C         pop bp
+ 001A  8B 46 06		     1C         mov ax,[bp+0*2+4+1*2]
+ 001D  5D		     1C         pop bp
+			      C         loadparam 0,2,bx
+ 001E  55		     1C         push bp
+ 001F  54		     1C         push sp
+ 0020  5D		     1C         pop bp
+ 0021  8B 5E 08		     1C         mov bx,[bp+0*2+4+2*2]
+ 0024  5D		     1C         pop bp
+ 0025  3B D8		      C         cmp bx,ax
+ 0027  73 02		      C         jae _max8_@end
+ 0029  8B D8		      C         mov bx,ax
+ 002B			      C         _max8_@end:
+ 002B  CA 0004		      C         ret 4
+ 002E			      C     _max8_ endp
+ 002E			      C     _min16_ proc far
+			      C         loadparam 0,1,ax
+ 002E  55		     1C         push bp
+ 002F  54		     1C         push sp
+ 0030  5D		     1C         pop bp
+ 0031  8B 46 06		     1C         mov ax,[bp+0*2+4+1*2]
+ 0034  5D		     1C         pop bp
+			      C         loadparam 0,2,bx
+ 0035  55		     1C         push bp
+ 0036  54		     1C         push sp
+ 0037  5D		     1C         pop bp
+ 0038  8B 5E 08		     1C         mov bx,[bp+0*2+4+2*2]
+ 003B  5D		     1C         pop bp
+ 003C  3B C3		      C         cmp ax,bx
+ 003E  73 02		      C         jae _min16_@end
+ 0040  8B D8		      C         mov bx,ax
+ 0042			      C         _min16_@end:
+ 0042  CA 0004		      C         ret 4
+ 0045			      C     _min16_ endp
+ 0045			      C     _max16_ proc far
+			      C         loadparam 0,1,ax
+ 0045  55		     1C         push bp
+ 0046  54		     1C         push sp
+ 0047  5D		     1C         pop bp
+ 0048  8B 46 06		     1C         mov ax,[bp+0*2+4+1*2]
+ 004B  5D		     1C         pop bp
+			      C         loadparam 0,2,bx
+ 004C  55		     1C         push bp
+ 004D  54		     1C         push sp
+ 004E  5D		     1C         pop bp
+ 004F  8B 5E 08		     1C         mov bx,[bp+0*2+4+2*2]
+ 0052  5D		     1C         pop bp
+ 0053  3B D8		      C         cmp bx,ax
+ 0055  73 02		      C         jae _max16_@end
+ 0057  8B D8		      C         mov bx,ax
+ 0059			      C         _max16_@end:
+ 0059  CA 0004		      C         ret 4
+ 005C			      C     _max16_ endp
+ 005C			      C __math__ ends
+			      C endif
+			      C ifdef hiahiahia
+			      C endif
+			      C 
+			      C ifdef __string__
+			      C else
+ 0000			      C __string__ segment
+			      C     ;function list
+			      C     ;1.void strcpy (@buffer,@buffer)
+			      C     ;2.void strcat (@buffer,@buffer)
+			      C     ;3.bx strcmp (@buffer,@buffer)
+			      C     ;4.bx strlen (@buffer)
+			      C     ;5.void substr (@buffer,@buffer,@8,@8)
+			      C 
+			      C     ;1.void strcpy (@buffer,@buffer)
+			      C     ;copy second@buffer to first@buffer
+			      C     ;make sure first@buffer is enough
+			      C     ;if not enough will not copy And errorlevel=1
+			      C 
+			      C     ;2.void strcat (@buffer,@buffer)
+			      C     ;catenate second@buffer to first@buffer's tail
+			      C     ;make sure first@buffer is enough
+			      C     ;if not enough will not catenate And errorlevel=2
+			      C 
+			      C     ;3.bx strcmp (@buffer,@buffer)
+			      C     ;compare two buffer,bh=<:0ffffh,=:0,>:1
+			      C 
+			      C     ;4.bx strlen (@buffer)
+			      C     ;determine buffer's length,bx=length
+			      C 
+			      C     ;5.void strsub (@buffer,@buffer,@8,@8)
+			      C     ;copy second@buffer[@8,@8) into first@buffer
+			      C     ;make sure first@buffer is enough
+			      C     ;if not enough will not copy And errorlevel=5
+			      C 
+			      C     ;attention:if not enough,const number "errorlevel" will be assigned
+			      C     ;you can use d16 errorlevel after every str function if errorlevel
+			      C     ;isn't zero,meaning error occured
+			      C 
+ = callso2 _strcpy_,	      C     strcpy equ callso2 _strcpy_,
+ = callso2 _strcat_,	      C     strcat equ callso2 _strcat_,
+ = callso2 _strcmp_,	      C     strcmp equ callso2 _strcmp_,
+ = callso _strlen_,	      C     strlen equ callso _strlen_,
+ = callso282 _strsub_,	      C     strsub equ callso282 _strsub_,
+			      C 
+ 0000			      C     _strcpy_ proc far
+ 0000  1E		      C         push ds
+ 0001  57		      C         push di
+ 0002  06		      C         push es
+ 0003  56		      C         push si
+			      C 
+			      C         loadparam 4,1,ax
+ 0004  55		     1C         push bp
+ 0005  54		     1C         push sp
+ 0006  5D		     1C         pop bp
+ 0007  8B 46 0E		     1C         mov ax,[bp+4*2+4+1*2]
+ 000A  5D		     1C         pop bp
+ 000B  8E C0		      C         mov es,ax
+			      C         loadparam 4,3,ax
+ 000D  55		     1C         push bp
+ 000E  54		     1C         push sp
+ 000F  5D		     1C         pop bp
+ 0010  8B 46 12		     1C         mov ax,[bp+4*2+4+3*2]
+ 0013  5D		     1C         pop bp
+ 0014  8E D8		      C         mov ds,ax
+			      C         loadparam 4,2,di
+ 0016  55		     1C         push bp
+ 0017  54		     1C         push sp
+ 0018  5D		     1C         pop bp
+ 0019  8B 7E 10		     1C         mov di,[bp+4*2+4+2*2]
+ 001C  5D		     1C         pop bp
+			      C         loadparam 4,4,si
+ 001D  55		     1C         push bp
+ 001E  54		     1C         push sp
+ 001F  5D		     1C         pop bp
+ 0020  8B 76 14		     1C         mov si,[bp+4*2+4+4*2]
+ 0023  5D		     1C         pop bp
+ 0024  26: 8A 45 FE	      C         mov al,es:[di-2]
+ 0028  8A 64 FF		      C         mov ah,[si-1]
+ 002B  38 E0		      C         cmp al,ah
+ 002D  73 02		      C         jae _strcpy_@ok
+ = 0001			      C         errorlevel=1
+ 002F  EB 12		      C         jmp _strcpy_@end
+ 0031			      C         _strcpy_@ok:
+ 0031  FC		      C         cld
+ 0032  51		      C         push cx
+			      C         move cx,[si-1]
+ 0033  50		     1C         push ax
+ 0034  8A 44 FF		     1C         mov al,[si-1]
+ 0037  98		     1C         cbw
+ 0038  8B C8		     1C         mov cx,ax
+ 003A  58		     1C         pop ax
+ 003B  F3/ A4		      C         rep movsb
+ 003D  26: C7 05 0000	      C         mov es:[di],0
+ 0042  59		      C         pop cx
+			      C 
+ 0043			      C         _strcpy_@end:
+ 0043  5E		      C         pop si
+ 0044  07		      C         pop es
+ 0045  5F		      C         pop di
+ 0046  1F		      C         pop ds
+ 0047  CA 0008		      C         ret 8
+ 004A			      C     _strcpy_ endp
+ 004A			      C     _strcat_ proc far
+ 004A  1E		      C         push ds
+ 004B  57		      C         push di
+ 004C  06		      C         push es
+ 004D  56		      C         push si
+			      C 
+			      C         loadparam 4,1,ax
+ 004E  55		     1C         push bp
+ 004F  54		     1C         push sp
+ 0050  5D		     1C         pop bp
+ 0051  8B 46 0E		     1C         mov ax,[bp+4*2+4+1*2]
+ 0054  5D		     1C         pop bp
+ 0055  8E C0		      C         mov es,ax
+			      C         loadparam 4,3,ax
+ 0057  55		     1C         push bp
+ 0058  54		     1C         push sp
+ 0059  5D		     1C         pop bp
+ 005A  8B 46 12		     1C         mov ax,[bp+4*2+4+3*2]
+ 005D  5D		     1C         pop bp
+ 005E  8E D8		      C         mov ds,ax
+			      C         loadparam 4,2,di
+ 0060  55		     1C         push bp
+ 0061  54		     1C         push sp
+ 0062  5D		     1C         pop bp
+ 0063  8B 7E 10		     1C         mov di,[bp+4*2+4+2*2]
+ 0066  5D		     1C         pop bp
+			      C         loadparam 4,4,si
+ 0067  55		     1C         push bp
+ 0068  54		     1C         push sp
+ 0069  5D		     1C         pop bp
+ 006A  8B 76 14		     1C         mov si,[bp+4*2+4+4*2]
+ 006D  5D		     1C         pop bp
+ 006E  26: 8A 45 FE	      C         mov al,es:[di-2]    ;capacity
+ 0072  26: 8A 65 FF	      C         mov ah,es:[di-1]    ;size
+ 0076  2A C4		      C         sub al,ah           ;remain
+ 0078  8A 64 FF		      C         mov ah,[si-1]       ;need
+ 007B  38 E0		      C         cmp al,ah
+ 007D  73 02		      C         jae _strcat_@ok
+ = 0002			      C         errorlevel=2
+ 007F  EB 2B		      C         jmp _strcat_@end
+ 0081			      C         _strcat_@ok:
+ 0081  FC		      C         cld
+ 0082  51		      C         push cx
+			      C         move cx,es:[si-1]
+ 0083  50		     1C         push ax
+ 0084  26: 8A 44 FF	     1C         mov al,es:[si-1]
+ 0088  98		     1C         cbw
+ 0089  8B C8		     1C         mov cx,ax
+ 008B  58		     1C         pop ax
+ 008C  00 4D FF		      C         add [di-1],cl
+			      C         move cx,[di-1]
+ 008F  50		     1C         push ax
+ 0090  8A 45 FF		     1C         mov al,[di-1]
+ 0093  98		     1C         cbw
+ 0094  8B C8		     1C         mov cx,ax
+ 0096  58		     1C         pop ax
+ 0097  03 F9		      C         add di,cx
+			      C         move cx,es:[si-1]
+ 0099  50		     1C         push ax
+ 009A  26: 8A 44 FF	     1C         mov al,es:[si-1]
+ 009E  98		     1C         cbw
+ 009F  8B C8		     1C         mov cx,ax
+ 00A1  58		     1C         pop ax
+ 00A2  2B F9		      C         sub di,cx
+ 00A4  F3/ A4		      C         rep movsb
+ 00A6  26: C7 05 0000	      C         mov es:[di],0
+ 00AB  59		      C         pop cx
+			      C 
+ 00AC			      C         _strcat_@end:
+ 00AC  5E		      C         pop si
+ 00AD  07		      C         pop es
+ 00AE  5F		      C         pop di
+ 00AF  1F		      C         pop ds
+ 00B0  CA 0008		      C         ret 8
+ 00B3			      C     _strcat_ endp
+ 00B3			      C     _strcmp_ proc far
+ 00B3  1E		      C         push ds
+ 00B4  57		      C         push di
+ 00B5  06		      C         push es
+ 00B6  56		      C         push si
+			      C         
+			      C         loadparam 4,1,ax
+ 00B7  55		     1C         push bp
+ 00B8  54		     1C         push sp
+ 00B9  5D		     1C         pop bp
+ 00BA  8B 46 0E		     1C         mov ax,[bp+4*2+4+1*2]
+ 00BD  5D		     1C         pop bp
+ 00BE  8E D8		      C         mov ds,ax
+			      C         loadparam 4,3,ax
+ 00C0  55		     1C         push bp
+ 00C1  54		     1C         push sp
+ 00C2  5D		     1C         pop bp
+ 00C3  8B 46 12		     1C         mov ax,[bp+4*2+4+3*2]
+ 00C6  5D		     1C         pop bp
+ 00C7  8E C0		      C         mov es,ax
+			      C         loadparam 4,2,si
+ 00C9  55		     1C         push bp
+ 00CA  54		     1C         push sp
+ 00CB  5D		     1C         pop bp
+ 00CC  8B 76 10		     1C         mov si,[bp+4*2+4+2*2]
+ 00CF  5D		     1C         pop bp
+			      C         loadparam 4,4,di
+ 00D0  55		     1C         push bp
+ 00D1  54		     1C         push sp
+ 00D2  5D		     1C         pop bp
+ 00D3  8B 7E 14		     1C         mov di,[bp+4*2+4+4*2]
+ 00D6  5D		     1C         pop bp
+ 00D7  FC		      C         cld
+ 00D8  51		      C         push cx
+ 00D9  B7 00		      C         mov bh,0
+			      C         max8 [si-1],es:[di-1]
+ 00DB  50		     1C         push ax
+ 00DC  50		     2C         push ax
+ 00DD  26: 8A 45 FF	     2C         mov al,es:[di-1]
+ 00E1  98		     2C         cbw
+ 00E2  8B C0		     2C         mov ax,ax
+ 00E4  58		     2C         pop ax
+ 00E5  50		     1C         push ax
+ 00E6  50		     2C         push ax
+ 00E7  8A 44 FF		     2C         mov al,[si-1]
+ 00EA  98		     2C         cbw
+ 00EB  8B C0		     2C         mov ax,ax
+ 00ED  58		     2C         pop ax
+ 00EE  50		     1C         push ax
+ 00EF  9A ---- 0017 R	     1C         call _max8_
+ 00F4  58		     1C         pop ax
+ 00F5  8B CB		      C         mov cx,bx
+ 00F7  F2/ A6		      C         repnz cmpsb
+ 00F9  77 07		      C         ja _strcmp_@above
+ 00FB  72 0A		      C         jb _strcmp_@below
+ 00FD  BB 0000		      C         mov bx,0
+ 0100  EB 08		      C         jmp _strcmp_@end
+ 0102			      C         _strcmp_@above:
+ 0102  BB 0001		      C         mov bx,1
+ 0105  EB 03		      C         jmp _strcmp_@end
+ 0107			      C         _strcmp_@below:
+ 0107  BB FFFF		      C         mov bx,-1
+			      C 
+ 010A			      C         _strcmp_@end:
+ 010A  59		      C         pop cx
+ 010B  5E		      C         pop si
+ 010C  07		      C         pop es
+ 010D  5F		      C         pop di
+ 010E  1F		      C         pop ds
+ 010F  CA 0008		      C         ret 8
+ 0112			      C     _strcmp_ endp
+ 0112			      C     _strlen_ proc far
+ 0112  57		      C         push di
+ 0113  1E		      C         push ds
+			      C 
+			      C         loadparam 2,1,ax
+ 0114  55		     1C         push bp
+ 0115  54		     1C         push sp
+ 0116  5D		     1C         pop bp
+ 0117  8B 46 0A		     1C         mov ax,[bp+2*2+4+1*2]
+ 011A  5D		     1C         pop bp
+ 011B  8E D8		      C         mov ds,ax
+			      C         loadparam 2,2,di
+ 011D  55		     1C         push bp
+ 011E  54		     1C         push sp
+ 011F  5D		     1C         pop bp
+ 0120  8B 7E 0C		     1C         mov di,[bp+2*2+4+2*2]
+ 0123  5D		     1C         pop bp
+ 0124  8A 5D FF		      C         mov bl,[di-1]
+ 0127  B7 00		      C         mov bh,0
+			      C 
+ 0129  1F		      C         pop ds
+ 012A  5F		      C         pop di
+ 012B  CA 0004		      C         ret 4
+ 012E			      C     _strlen_ endp
+ 012E			      C     _strsub_ proc far
+ 012E  1E		      C         push ds
+ 012F  57		      C         push di
+ 0130  06		      C         push es
+ 0131  56		      C         push si
+			      C 
+			      C         loadparam 4,1,ax
+ 0132  55		     1C         push bp
+ 0133  54		     1C         push sp
+ 0134  5D		     1C         pop bp
+ 0135  8B 46 0E		     1C         mov ax,[bp+4*2+4+1*2]
+ 0138  5D		     1C         pop bp
+ 0139  8E C0		      C         mov es,ax
+			      C         loadparam 4,3,ax
+ 013B  55		     1C         push bp
+ 013C  54		     1C         push sp
+ 013D  5D		     1C         pop bp
+ 013E  8B 46 12		     1C         mov ax,[bp+4*2+4+3*2]
+ 0141  5D		     1C         pop bp
+ 0142  8E D8		      C         mov ds,ax
+			      C         loadparam 4,2,di
+ 0144  55		     1C         push bp
+ 0145  54		     1C         push sp
+ 0146  5D		     1C         pop bp
+ 0147  8B 7E 10		     1C         mov di,[bp+4*2+4+2*2]
+ 014A  5D		     1C         pop bp
+			      C         loadparam 4,4,si
+ 014B  55		     1C         push bp
+ 014C  54		     1C         push sp
+ 014D  5D		     1C         pop bp
+ 014E  8B 76 14		     1C         mov si,[bp+4*2+4+4*2]
+ 0151  5D		     1C         pop bp
+			      C         loadparam 4,5,ax
+ 0152  55		     1C         push bp
+ 0153  54		     1C         push sp
+ 0154  5D		     1C         pop bp
+ 0155  8B 46 16		     1C         mov ax,[bp+4*2+4+5*2]
+ 0158  5D		     1C         pop bp
+ 0159  03 F0		      C         add si,ax
+ 015B  51		      C         push cx
+			      C         loadparam 5,6,cx
+ 015C  55		     1C         push bp
+ 015D  54		     1C         push sp
+ 015E  5D		     1C         pop bp
+ 015F  8B 4E 1A		     1C         mov cx,[bp+5*2+4+6*2]
+ 0162  5D		     1C         pop bp
+ 0163  3A 4C FF		      C         cmp cl,[si-1]
+ 0166  76 02		      C         jbe _strsub_@ok
+ = 0005			      C         errorlevel=5
+ 0168  EB 05		      C         jmp _strsub_@end
+ 016A			      C         _strsub_@ok:
+ 016A  2B C8		      C         sub cx,ax
+ 016C  FC		      C         cld
+ 016D  F3/ A4		      C         rep movsb
+			      C 
+ 016F			      C         _strsub_@end:
+ 016F  59		      C         pop cx
+ 0170  5E		      C         pop si
+ 0171  07		      C         pop es
+ 0172  5F		      C         pop di
+ 0173  1F		      C         pop ds
+ 0174  CA 000C		      C         ret 12
+ 0177			      C     _strsub_ endp
+ 0177			      C __string__ ends
+			      C endif
+			      C ifdef hiahiahia
+			      C endif
+			      C 
+ 0000				datas segment
+ 0000 = 0000			    m equ this dword
+ 0000 0001 R ---- R		    main dw (offset $main)+1,seg $main
+				    darg
+ 0004  0080 [		     1	        arg db 80h dup(0)
+        00
+       ]
+				    dbuffer input,15
+ 0084 0F 00		     1	        pre_input db 15,0
+ 0086  000F [		     1	        input db 15 dup(0),0
+        00
+       ] 00
+				    dbuffer output,15
+ 0096 0F 00		     1	        pre_output db 15,0
+ 0098  000F [		     1	        output db 15 dup(0),0
+        00
+       ] 00
+ 00A8				datas ends
+ 0000				css segment
+ 0000				@main:
+ 0000  EA ---- 0000 R		    jmp far ptr $main
+ 0005				css ends
+ 0000				codes segment
+				    assume cs:codes,ds:datas
+ 0000				$main:
+ 0000  B8 ---- R		    mov ax,datas
+ 0003  8E D8			    mov ds,ax
+				    ;jmp end$
+				    gets input
+ 0005  50		     1	        push ax
+ 0006  B8 0086 R	     1	        mov ax,offset input
+ 0009  50		     1	        push ax
+ 000A  B8 ---- R	     1	        mov ax,seg input
+ 000D  50		     1	        push ax
+ 000E  9A ---- 0078 R	     1	        call _gets_
+ 0013  58		     1	        pop ax
+				    putchar 0ah
+ 0014  50		     1	        push ax
+ 0015  B8 000A		     1	        mov ax,0ah
+ 0018  50		     1	        push ax
+ 0019  9A ---- 0000 R	     1	        call _putchar_
+ 001E  58		     1	        pop ax
+				    gets output
+ 001F  50		     1	        push ax
+ 0020  B8 0098 R	     1	        mov ax,offset output
+ 0023  50		     1	        push ax
+ 0024  B8 ---- R	     1	        mov ax,seg output
+ 0027  50		     1	        push ax
+ 0028  9A ---- 0078 R	     1	        call _gets_
+ 002D  58		     1	        pop ax
+				    putchar 0ah
+ 002E  50		     1	        push ax
+ 002F  B8 000A		     1	        mov ax,0ah
+ 0032  50		     1	        push ax
+ 0033  9A ---- 0000 R	     1	        call _putchar_
+ 0038  58		     1	        pop ax
+				    strcat output,input
+ 0039  50		     1	        push ax
+ 003A  B8 0086 R	     1	        mov ax,offset input
+ 003D  50		     1	        push ax
+ 003E  B8 ---- R	     1	        mov ax,seg input
+ 0041  50		     1	        push ax
+ 0042  B8 0098 R	     1	        mov ax,offset output
+ 0045  50		     1	        push ax
+ 0046  B8 ---- R	     1	        mov ax,seg output
+ 0049  50		     1	        push ax
+ 004A  9A ---- 004A R	     1	        call _strcat_
+ 004F  58		     1	        pop ax
+				    d16 bx
+ 0050  50		     1	        push ax
+ 0051  8B C3		     1	        mov ax,bx
+ 0053  50		     1	        push ax
+ 0054  9A ---- 0069 R	     1	        call _d16_
+ 0059  58		     1	        pop ax
+				    putchar 0ah
+ 005A  50		     1	        push ax
+ 005B  B8 000A		     1	        mov ax,0ah
+ 005E  50		     1	        push ax
+ 005F  9A ---- 0000 R	     1	        call _putchar_
+ 0064  58		     1	        pop ax
+ 0065  EB 99			    jmp $main
+ 0067				$end:
+ 0067  B4 4C			    mov  ah,4ch
+ 0069  CD 21			    int  21h
+ 006B				codes ends
+				end  $main
+Microsoft (R) Macro Assembler Version 6.15.8803		    06/19/18 23:17:51
+exp.asm							     Symbols 2 - 1
+
+
+
+
+Macros:
+
+                N a m e                 Type
+
+call0  . . . . . . . . . . . . .	Proc
+call1  . . . . . . . . . . . . .	Proc
+call2  . . . . . . . . . . . . .	Proc
+call3  . . . . . . . . . . . . .	Proc
+call82 . . . . . . . . . . . . .	Proc
+callso282  . . . . . . . . . . .	Proc
+callso2  . . . . . . . . . . . .	Proc
+callso . . . . . . . . . . . . .	Proc
+darg . . . . . . . . . . . . . .	Proc
+dbuffer  . . . . . . . . . . . .	Proc
+dfile  . . . . . . . . . . . . .	Proc
+fclose . . . . . . . . . . . . .	Proc
+ferror . . . . . . . . . . . . .	Proc
+fgets  . . . . . . . . . . . . .	Proc
+fopen  . . . . . . . . . . . . .	Proc
+getch  . . . . . . . . . . . . .	Proc
+loadend  . . . . . . . . . . . .	Proc
+loadparam  . . . . . . . . . . .	Proc
+loadp  . . . . . . . . . . . . .	Proc
+loadstart  . . . . . . . . . . .	Proc
+move . . . . . . . . . . . . . .	Proc
+
+
+Segments and Groups:
+
+                N a m e                 Size     Length   Align   Combine Class
+
+__base__ . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+__conarg__ . . . . . . . . . . .	16 Bit	 0025	  Para	  Private 
+__display__  . . . . . . . . . .	16 Bit	 0094	  Para	  Private 
+__file__ . . . . . . . . . . . .	16 Bit	 0000	  Para	  Private 
+__math__ . . . . . . . . . . . .	16 Bit	 005C	  Para	  Private 
+__stdio__  . . . . . . . . . . .	16 Bit	 00A3	  Para	  Private 
+__string__ . . . . . . . . . . .	16 Bit	 0177	  Para	  Private 
+codes  . . . . . . . . . . . . .	16 Bit	 006B	  Para	  Private 
+css  . . . . . . . . . . . . . .	16 Bit	 0005	  Para	  Private 
+datas  . . . . . . . . . . . . .	16 Bit	 00A8	  Para	  Private 
+
+
+Procedures,  parameters and locals:
+
+                N a m e                 Type     Value    Attr
+
+_d16_  . . . . . . . . . . . . .	P Far	 0069	  __display__	Length= 002B Private
+_gets_ . . . . . . . . . . . . .	P Far	 0078	  __stdio__	Length= 002B Private
+_h16_  . . . . . . . . . . . . .	P Far	 0000	  __display__	Length= 0022 Private
+_h4_ . . . . . . . . . . . . . .	P Far	 004C	  __display__	Length= 001D Private
+_h8_ . . . . . . . . . . . . . .	P Far	 0022	  __display__	Length= 002A Private
+_loadarg_  . . . . . . . . . . .	P Far	 0000	  __conarg__	Length= 0025 Private
+_max16_  . . . . . . . . . . . .	P Far	 0045	  __math__	Length= 0017 Private
+_max8_ . . . . . . . . . . . . .	P Far	 0017	  __math__	Length= 0017 Private
+_min16_  . . . . . . . . . . . .	P Far	 002E	  __math__	Length= 0017 Private
+_min8_ . . . . . . . . . . . . .	P Far	 0000	  __math__	Length= 0017 Private
+_put$_ . . . . . . . . . . . . .	P Far	 0012	  __stdio__	Length= 0019 Private
+_put_  . . . . . . . . . . . . .	P Far	 004E	  __stdio__	Length= 002A Private
+_putchar_  . . . . . . . . . . .	P Far	 0000	  __stdio__	Length= 0012 Private
+_puts_ . . . . . . . . . . . . .	P Far	 002B	  __stdio__	Length= 0023 Private
+_strcat_ . . . . . . . . . . . .	P Far	 004A	  __string__	Length= 0069 Private
+_strcmp_ . . . . . . . . . . . .	P Far	 00B3	  __string__	Length= 005F Private
+_strcpy_ . . . . . . . . . . . .	P Far	 0000	  __string__	Length= 004A Private
+_strlen_ . . . . . . . . . . . .	P Far	 0112	  __string__	Length= 001C Private
+_strsub_ . . . . . . . . . . . .	P Far	 012E	  __string__	Length= 0049 Private
+
+
+Symbols:
+
+                N a m e                 Type     Value    Attr
+
+$end . . . . . . . . . . . . . .	L Near	 0067	  codes	
+$main  . . . . . . . . . . . . .	L Near	 0000	  codes	
+@main  . . . . . . . . . . . . .	L Near	 0000	  css	
+_d16_@end  . . . . . . . . . . .	L Near	 008E	  __display__	
+_d16_@loop . . . . . . . . . . .	L Near	 0078	  __display__	
+_d16_@put  . . . . . . . . . . .	L Near	 0085	  __display__	
+_h4_@num . . . . . . . . . . . .	L Near	 005F	  __display__	
+_loadarg_@loadarg  . . . . . . .	L Near	 0013	  __conarg__	
+_loadarg_@ok . . . . . . . . . .	L Near	 0020	  __conarg__	
+_max16_@end  . . . . . . . . . .	L Near	 0059	  __math__	
+_max8_@end . . . . . . . . . . .	L Near	 002B	  __math__	
+_min16_@end  . . . . . . . . . .	L Near	 0042	  __math__	
+_min8_@end . . . . . . . . . . .	L Near	 0014	  __math__	
+_put_$end  . . . . . . . . . . .	L Near	 0071	  __stdio__	
+_put_$loop . . . . . . . . . . .	L Near	 0067	  __stdio__	
+_puts_$end . . . . . . . . . . .	L Near	 0047	  __stdio__	
+_puts_$loop  . . . . . . . . . .	L Near	 003C	  __stdio__	
+_strcat_@end . . . . . . . . . .	L Near	 00AC	  __string__	
+_strcat_@ok  . . . . . . . . . .	L Near	 0081	  __string__	
+_strcmp_@above . . . . . . . . .	L Near	 0102	  __string__	
+_strcmp_@below . . . . . . . . .	L Near	 0107	  __string__	
+_strcmp_@end . . . . . . . . . .	L Near	 010A	  __string__	
+_strcpy_@end . . . . . . . . . .	L Near	 0043	  __string__	
+_strcpy_@ok  . . . . . . . . . .	L Near	 0031	  __string__	
+_strsub_@end . . . . . . . . . .	L Near	 016F	  __string__	
+_strsub_@ok  . . . . . . . . . .	L Near	 016A	  __string__	
+arg  . . . . . . . . . . . . . .	Byte	 0004	  datas	
+d16  . . . . . . . . . . . . . .	Text   	 call1 _d16_,
+errorlevel . . . . . . . . . . .	Number	 0005h	 
+gets . . . . . . . . . . . . . .	Text   	 callso _gets_,
+h16  . . . . . . . . . . . . . .	Text   	 call1 _h16_,
+h4 . . . . . . . . . . . . . . .	Text   	 call1 _h4_,
+h8 . . . . . . . . . . . . . . .	Text   	 call1 _h8_,
+input  . . . . . . . . . . . . .	Byte	 0086	  datas	
+loadarg  . . . . . . . . . . . .	Text   	 call0 _loadarg_
+main . . . . . . . . . . . . . .	Word	 0000	  datas	
+max16  . . . . . . . . . . . . .	Text   	 call2 _max16_,
+max8 . . . . . . . . . . . . . .	Text   	 call82 _max8_,
+min16  . . . . . . . . . . . . .	Text   	 call2 _min16_,
+min8 . . . . . . . . . . . . . .	Text   	 call82 _min8_,
+m  . . . . . . . . . . . . . . .	Number	 0000h	 
+output . . . . . . . . . . . . .	Byte	 0098	  datas	
+pre_input  . . . . . . . . . . .	Byte	 0084	  datas	
+pre_output . . . . . . . . . . .	Byte	 0096	  datas	
+put$ . . . . . . . . . . . . . .	Text   	 callso _put$_,
+putchar  . . . . . . . . . . . .	Text   	 call1 _putchar_,
+puts . . . . . . . . . . . . . .	Text   	 callso _puts_,
+put  . . . . . . . . . . . . . .	Text   	 callso _put_,
+strcat . . . . . . . . . . . . .	Text   	 callso2 _strcat_,
+strcmp . . . . . . . . . . . . .	Text   	 callso2 _strcmp_,
+strcpy . . . . . . . . . . . . .	Text   	 callso2 _strcpy_,
+strlen . . . . . . . . . . . . .	Text   	 callso _strlen_,
+strsub . . . . . . . . . . . . .	Text   	 callso282 _strsub_,
+
+	   0 Warnings
+	   0 Errors

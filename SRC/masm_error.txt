@@ -1,0 +1,1 @@
+exp.asm(23) : error A2084: constant value too large
