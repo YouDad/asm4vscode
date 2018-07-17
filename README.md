@@ -1,6 +1,6 @@
 # asm4vscode
 ## That's mains using visual studio code to edit, masm, link the asm file.
-## Now Version is ==6==, version 1 to 5 is completed at location.
+## Now Version is 6, version 1 to 5 is completed at location.
 #### How to use the folder?
 1. Download a vscode from [here](https://code.visualstudio.com/).
 2. Install vscode
