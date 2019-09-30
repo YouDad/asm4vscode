@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "run_asm",
+            "label": "运行",
             "type": "shell",
-            "command": "cd .. ; ./run_asm \\\"${file}\\\" 0",
+            "command": "python ../enable.py run ${file} || cd .. && run_asm \\\"${file}\\\" 0",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -12,9 +12,9 @@
             }
         },
         {
-            "label": "debug_asm",
+            "label": "调试",
             "type": "shell",
-            "command": "cd .. ; ./debug_asm \\\"${file}\\\" 0",
+            "command": "python ../enable.py debug ${file} || cd .. && debug_asm \\\"${file}\\\" 0",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -22,9 +22,9 @@
             }
         },
         {
-            "label": "new_asm",
+            "label": "新建",
             "type": "shell",
-            "command": "cd .. ; ./new_asm",
+            "command": "python ../enable.py new ${file} || cd .. && new_asm",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -32,9 +32,9 @@
             }
         },
         {
-            "label": "make_asm",
+            "label": "编译验证",
             "type": "shell",
-            "command": "cd .. ; ./make_asm \\\"${file}\\\" 0",
+            "command": "python ../enable.py make ${file} || cd .. && make_asm \\\"${file}\\\" 0",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -42,9 +42,9 @@
             }
         },
         {
-            "label": "list_asm",
+            "label": "预处理",
             "type": "shell",
-            "command": "cd .. ; ./list_asm \\\"${file}\\\" 0",
+            "command": "python ../enable.py list ${file} || cd .. && list_asm \\\"${file}\\\" 0",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
