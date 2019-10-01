@@ -34,7 +34,7 @@ def set_path(pwd):
 	os.environ["PATH"] += ";%s\\DOSBOX" % pwd
 
 def make_asm(file):
-	ret = os.system("MASM.EXE SRC\\%s.asm %s.obj" % (file, file))
+	ret = os.system("ML.EXE /I. /Zm /c /Fo%s.obj /Ta SRC\\%s.asm" % (file, file))
 	if ret != 0:
 		sys.exit(ret)
 	if DEBUG:
@@ -52,7 +52,7 @@ def link_asm(file):
 		print("link_asm success")
 
 def list_asm(file):
-	ret = os.system("MASM.EXE SRC\\%s.asm,,SRC\\list.lst" % file)
+	ret = os.system("ML.EXE /I. /Zm /c /FlSRC\\list.lst /Ta SRC\\%s.asm" % file)
 	if ret != 0:
 		sys.exit(ret)
 
